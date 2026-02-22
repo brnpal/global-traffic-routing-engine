@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  --color-zinc-50: #fafafa;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-600: #52525b;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
+  --color-zinc-950: #09090b;
+  --color-indigo-400: #818cf8;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-zinc-950);
+    color: var(--color-zinc-50);
+  }
+}
+
+@utility glass-panel {
+  background-color: rgba(24, 24, 27, 0.5);
+  /* zinc-900/50 */
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(39, 39, 42, 0.5);
+  /* zinc-800/50 */
+  border-radius: 0.75rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+/* Custom mapbox popup overrides */
+.mapboxgl-popup-content {
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.mapboxgl-popup-tip {
+  display: none !important;
+}
