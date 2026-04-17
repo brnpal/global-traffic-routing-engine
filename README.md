@@ -1,46 +1,50 @@
-in bash,
+# Global Traffic Routing Engine
 
-download the code to their local machine:
+> [!NOTE]
+> **This project has moved.** It now lives as a live, in-browser demo at
+> **[brendanallaway.me/global-traffic-routing-engine/](https://brendanallaway.me/global-traffic-routing-engine/)**.
+>
+> This repository is archived and kept read-only as a source-code reference.
+> The active implementation is maintained in the
+> [portfolio repo](https://github.com/brnpal/portfolio/tree/main/global-traffic-routing-engine),
+> where the FastAPI WebSocket backend has been replaced with a pure client-side
+> simulation loop so the whole thing runs as static HTML/CSS/JS with no server.
+>
+> This archived version is the original dual-component architecture
+> (FastAPI backend + Vite/React frontend with Mapbox) preserved for reference.
 
-git clone https://github.com/brnpal/global-traffic-routing-engine.git
-cd global-traffic-routing-engine
+## About
 
-create their own Python environment and install the required packages:
+Live view of lower-level network flows, metro rings, and physical
+infrastructure around the world. Drop simulated users onto the network
+fabric and watch edge and core routing decisions resolve in real time.
 
-# Navigate to the API folder
+**Architecture (this archived version):**
+- `api/` — FastAPI + Uvicorn WebSocket server streaming routing decisions
+- `web/` — Vite + React + Mapbox frontend
+
+## Running locally
+
+### Backend
+
+```bash
 cd api
-
-# Create a new virtual environment
 python3 -m venv .venv
-
-# Activate the virtual environment
-source .venv/bin/activate  # On Windows, they would use: .venv\Scripts\activate
-
-# Install the required Python packages (FastAPI, Uvicorn, and Websockets)
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install fastapi uvicorn websockets
+uvicorn main:app --reload   # runs on :8000
+```
 
-# Start the backend server on port 8000
-uvicorn main:app --reload
+### Frontend
 
-In a separate terminal, they will need to install the Node.js dependencies and provide their own Mapbox token
+In a separate terminal:
 
-# Navigate to the Web folder
+```bash
 cd web
-
-# Install all Node.js dependencies (React, Mapbox, Tailwind, etc.)
 npm install
+echo "VITE_MAPBOX_TOKEN=your_mapbox_token_here" > .env.local
+npm run dev                 # runs on :5173
+```
 
-# Create their own environment file
-touch .env.local
-
-in env, 
-
-VITE_MAPBOX_TOKEN=their_own_mapbox_token_here
-
-Finally, start the frontend development server, in bash:
-
-npm run dev
-
-open the localhost link provided by Vite.
-
-
+Open the Vite URL and the frontend will connect to the backend via
+`ws://localhost:8000/ws`.
