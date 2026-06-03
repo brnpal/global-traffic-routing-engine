@@ -7,7 +7,7 @@ import greatCircle from '@turf/great-circle'
 import { LocalMetroPanel } from './components/LocalMetroPanel'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || ''
-const WS_URL = 'ws://localhost:8000/ws'
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'
 
 export type NodeType = 'core' | 'edge'
 
