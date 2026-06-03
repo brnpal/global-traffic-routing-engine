@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Map, { Marker, NavigationControl, Source, Layer, Popup } from 'react-map-gl/mapbox'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { Activity, Server, Zap, Trash2, Database, Network } from 'lucide-react'
@@ -7,7 +7,6 @@ import greatCircle from '@turf/great-circle'
 import { LocalMetroPanel } from './components/LocalMetroPanel'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || ''
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'
 
 export type NodeType = 'core' | 'edge'
 
@@ -69,6 +68,32 @@ function haversineDist(lat1: number, lon1: number, lat2: number, lon2: number) {
     return R * c;
 }
 
+// Resolve a routing decision entirely client-side: pick the nearest edge PoP
+// to the user by great-circle distance. This mirrors what the FastAPI backend
+// did, so the demo runs as a static site with no server dependency.
+function resolveRoute(user: User, nodes: Node[]): Route | null {
+    const edgeNodes = nodes.filter(n => n.type === 'edge')
+    if (edgeNodes.length === 0) return null
+
+    let closest = edgeNodes[0]
+    let minDistance = Infinity
+    for (const node of edgeNodes) {
+        const dist = haversineDist(user.lat, user.lng, node.lat, node.lng)
+        if (dist < minDistance) {
+            minDistance = dist
+            closest = node
+        }
+    }
+
+    return {
+        id: Math.random().toString(36).substr(2, 9),
+        user,
+        node: closest,
+        distance_km: Math.round(minDistance * 100) / 100,
+        timestamp: Date.now(),
+    }
+}
+
 function App() {
     const [nodes] = useState<Node[]>(INITIAL_NODES)
     const [users, setUsers] = useState<User[]>([])
@@ -80,16 +105,6 @@ function App() {
     const [selectedNode, setSelectedNode] = useState<Node | null>(null)
     const [hoveredUserId, setHoveredUserId] = useState<string | null>(null)
     const [activeUserId, setActiveUserId] = useState<string | null>(null)
-    const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected')
-
-    const wsRef = useRef<WebSocket | null>(null)
-
-    useEffect(() => {
-        connectWs()
-        return () => {
-            wsRef.current?.close()
-        }
-    }, [])
 
     useEffect(() => {
         // Trigger a re-render every second so the routeFeatures memo can naturally hide old routes
@@ -98,33 +113,6 @@ function App() {
         }, 1000)
         return () => clearInterval(interval)
     }, [])
-
-    const connectWs = () => {
-        setWsStatus('connecting')
-        const ws = new WebSocket(WS_URL)
-
-        ws.onopen = () => setWsStatus('connected')
-        ws.onclose = () => {
-            setWsStatus('disconnected')
-            setTimeout(connectWs, 3000)
-        }
-
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data)
-            if (data.type === 'ROUTING_DECISION') {
-                const route: Route = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    user: data.user,
-                    node: data.node,
-                    distance_km: data.distance_km,
-                    timestamp: Date.now()
-                }
-                setRoutes(prev => [...prev, route])
-            }
-        }
-
-        wsRef.current = ws
-    }
 
     const handleMapClick = useCallback((e: any) => {
         if (mode === 'idle') return
@@ -138,14 +126,8 @@ function App() {
             setUsers(prev => [...prev, newUser])
             setMode('idle')
 
-            if (wsRef.current?.readyState === WebSocket.OPEN && nodes.length > 0) {
-                const edgeNodes = nodes.filter(n => n.type === 'edge')
-                wsRef.current.send(JSON.stringify({
-                    type: 'SIMULATE_TRAFFIC',
-                    nodes: edgeNodes,
-                    user: newUser
-                }))
-            }
+            const route = resolveRoute(newUser, nodes)
+            if (route) setRoutes(prev => [...prev, route])
         }
     }, [mode, nodes])
 
@@ -232,13 +214,13 @@ function App() {
             <div className="absolute top-4 left-4 z-10 w-80 flex flex-col gap-4">
                 <div className="glass-panel p-6">
                     <div className="flex items-center gap-3 mb-6">
-                        <div className={`p-2 rounded-lg ${wsStatus === 'connected' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-500'}`}>
-                            <Network size={24} className={wsStatus === 'connected' ? 'animate-pulse' : ''} />
+                        <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+                            <Network size={24} className="animate-pulse" />
                         </div>
                         <div>
                             <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">Global Router</h1>
                             <p className="text-xs text-zinc-400 flex items-center gap-1">
-                                {wsStatus === 'connected' ? '● Live Simulation' : '○ Offline'}
+                                ● Live Simulation
                             </p>
                         </div>
                     </div>
@@ -256,15 +238,11 @@ function App() {
 
                         <button
                             onClick={() => {
-                                if (nodes.length > 0 && users.length > 0 && wsRef.current?.readyState === WebSocket.OPEN) {
-                                    const edgeNodes = nodes.filter(n => n.type === 'edge')
-                                    users.forEach(u => {
-                                        wsRef.current?.send(JSON.stringify({
-                                            type: 'SIMULATE_TRAFFIC',
-                                            nodes: edgeNodes, // Send only edge nodes to backend to decide
-                                            user: u
-                                        }))
-                                    })
+                                if (nodes.length > 0 && users.length > 0) {
+                                    const fresh = users
+                                        .map(u => resolveRoute(u, nodes))
+                                        .filter((r): r is Route => r !== null)
+                                    setRoutes(prev => [...prev, ...fresh])
                                 }
                             }}
                             disabled={nodes.length === 0 || users.length === 0}

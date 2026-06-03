@@ -4,32 +4,37 @@ Live view of lower-level network flows, metro rings, and physical
 infrastructure around the world. Drop simulated users onto the network
 fabric and watch edge and core routing decisions resolve in real time.
 
-A real-time, full-stack demo: simulated users are placed on a Mapbox globe,
-the FastAPI WebSocket backend resolves the nearest edge PoP via great-circle
-distance, and the routing decision is streamed back and animated edge→core.
+Simulated users are placed on a Mapbox globe; the app resolves the nearest
+edge PoP by great-circle distance and animates the user→edge→core path.
+**Routing runs entirely client-side**, so the demo deploys as a static site
+with no backend or server dependency — it works instantly for every visitor.
 
 ## Architecture
 
-- `api/` — FastAPI + Uvicorn WebSocket server streaming routing decisions
-- `web/` — Vite + React 19 + Mapbox GL frontend (react-map-gl, Turf.js, Tailwind)
+- `web/` — Vite + React 19 + Mapbox GL frontend (react-map-gl, Turf.js,
+  Tailwind). Computes routing in the browser (`resolveRoute` in `src/App.tsx`).
+- `api/` — **Optional.** The original FastAPI + Uvicorn WebSocket server that
+  performed the routing decision server-side. Preserved as a reference
+  implementation; the deployed frontend no longer depends on it.
 
 ## Deployment
 
-- **Backend** → [Render](https://render.com) (free web service, WebSocket support)
-  via [`render.yaml`](render.yaml). Exposes `wss://<service>.onrender.com/ws`.
-- **Frontend** → [Vercel](https://vercel.com) (root directory `web/`, Vite preset)
-  via [`web/vercel.json`](web/vercel.json).
-
-The frontend reads two environment variables at build time:
-
-| Variable | Purpose |
-| --- | --- |
-| `VITE_MAPBOX_TOKEN` | Mapbox public token (`pk.…`) — required for the map to render |
-| `VITE_WS_URL` | WebSocket URL of the backend, e.g. `wss://gtre-api.onrender.com/ws`. Falls back to `ws://localhost:8000/ws` for local dev. |
+- **Frontend** → [Vercel](https://vercel.com) (root directory `web/`, Vite
+  preset) via [`web/vercel.json`](web/vercel.json). The only required env var
+  is `VITE_MAPBOX_TOKEN` (a Mapbox public `pk.…` token).
+- `render.yaml` is kept for anyone who wants to also run the optional backend
+  on [Render](https://render.com), but it is not needed to run the demo.
 
 ## Running locally
 
-### Backend
+```bash
+cd web
+npm install
+cp .env.example .env.local   # then fill in VITE_MAPBOX_TOKEN
+npm run dev                  # runs on :5173 — no backend required
+```
+
+### Optional: run the original FastAPI backend
 
 ```bash
 cd api
@@ -38,17 +43,3 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --reload   # runs on :8000
 ```
-
-### Frontend
-
-In a separate terminal:
-
-```bash
-cd web
-npm install
-cp .env.example .env.local   # then fill in VITE_MAPBOX_TOKEN
-npm run dev                  # runs on :5173
-```
-
-With `VITE_WS_URL` unset, the frontend connects to the local backend at
-`ws://localhost:8000/ws`.
